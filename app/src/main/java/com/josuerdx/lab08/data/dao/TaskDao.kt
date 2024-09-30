@@ -28,4 +28,8 @@ interface TaskDao {
     // Eliminar todas las tareas
     @Query("DELETE FROM tasks")
     suspend fun deleteAllTasks()
+
+    // Eliminar una tarea individua
+    @Query("DELETE FROM tasks WHERE id = :taskId")
+    suspend fun deleteTask(taskId: Int)
 }

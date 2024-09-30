@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,11 +18,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.room.Room
 import com.josuerdx.lab08.components.MyTabBarScreen
 import com.josuerdx.lab08.components.MyToolbar
 import com.josuerdx.lab08.data.database.TaskDatabase
+import com.josuerdx.lab08.data.model.Task
 import com.josuerdx.lab08.ui.theme.Lab08Theme
 import com.josuerdx.viewmodel.TaskViewModel
 import kotlinx.coroutines.launch
@@ -61,6 +65,8 @@ fun TaskScreen(viewModel: TaskViewModel) {
     val tasks by viewModel.tasks.collectAsState()
     val coroutineScope = rememberCoroutineScope()
     var newTaskDescription by remember { mutableStateOf("") }
+    var editingTask by remember { mutableStateOf<Task?>(null) }
+    var editedDescription by remember { mutableStateOf("") }
 
     // Estructura de pantalla
     Box(modifier = Modifier.fillMaxSize()) {
@@ -86,14 +92,58 @@ fun TaskScreen(viewModel: TaskViewModel) {
                 // Lista de tareas
                 tasks.forEach { task ->
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically // Alinear verticalmente
                     ) {
-                        Text(text = task.description)
-                        Button(onClick = { viewModel.toggleTaskCompletion(task) }) {
-                            Text(if (task.isCompleted) "Completada" else "Pendiente")
+                        // Mostrar la descripción de la tarea
+                        Text(
+                            text = task.description,
+                            color = if (task.isCompleted) Color.Gray else Color.Black,
+                            style = if (task.isCompleted) MaterialTheme.typography.bodyMedium.copy(textDecoration = TextDecoration.LineThrough)
+                            else MaterialTheme.typography.bodyMedium
+                        )
+
+                        // Botón para editar tarea
+                        IconButton(onClick = {
+                            editingTask = task
+                            editedDescription = task.description
+                        }) {
+                            Icon(
+                                imageVector = Icons.Filled.Edit,
+                                contentDescription = "Editar tarea",
+                            )
                         }
+
+                        // Botón para eliminar tarea
+                        IconButton(onClick = { viewModel.deleteTask(task) }) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Eliminar tarea")
+                        }
+
+                        // Checkbox para completar tarea
+                        Checkbox(
+                            checked = task.isCompleted,
+                            onCheckedChange = {
+                                viewModel.toggleTaskCompletion(task)
+                            }
+                        )
                     }
+                }
+
+                // Diálogo de edición
+                if (editingTask != null) {
+                    EditTaskDialog(
+                        task = editingTask!!,
+                        onEdit = { newDescription ->
+                            coroutineScope.launch {
+                                viewModel.editTask(editingTask!!, newDescription)
+                                editingTask = null
+                            }
+                        },
+                        onDismiss = { editingTask = null }
+                    )
                 }
             }
         }
@@ -155,4 +205,38 @@ fun EmptyStateView() {
             modifier = Modifier.padding(top = 15.dp)
         )
     }
+}
+
+@Composable
+fun EditTaskDialog(task: Task, onEdit: (String) -> Unit, onDismiss: () -> Unit) {
+    var taskDescription by remember { mutableStateOf(task.description) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "Editar Tarea") },
+        text = {
+            TextField(
+                value = taskDescription,
+                onValueChange = { taskDescription = it },
+                label = { Text("Descripción de la tarea") },
+                singleLine = true
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (taskDescription.isNotBlank()) {
+                        onEdit(taskDescription)
+                    }
+                }
+            ) {
+                Text("Guardar")
+            }
+        },
+        dismissButton = {
+            Button(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
 }
